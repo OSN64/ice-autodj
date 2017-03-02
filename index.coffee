@@ -1,8 +1,8 @@
 promisify = require 'promisify-node'
 fs = promisify 'fs'
 Monitor = promisify 'icecast-monitor'
-DJ = require './dj'
 
+DJ = require './dj'
 cfg = require './config'
 
 Object.assign cfg.monitor, cfg.srv
@@ -18,9 +18,9 @@ Promise.all([
   files = res[0]?.map (file) -> cfg.dir + file
   feed = res[1]
 
-  return console.log 'No files ' if files.length is 0
+  return console.log 'No files in directory' if files.length is 0
 
-  dj = new DJ srv: cfg.dj,  playlist: files
+  dj = new DJ srv: cfg.dj,  playlist: files, name: cfg.name
 
   feed.on 'server.you', (val) -> console.log val
 
@@ -34,8 +34,11 @@ Promise.all([
 
     if sources >= 1
       monitor.getSource cfg.monitor.mount, (err, source) ->
-        return console.log err if err
+        return console.log '[INFO]', err if err
         # if source then live is streaming and stop dj
         dj.stop()
 
+  process.on 'SIGUSR1', ->
+    dj.stop()
+    dj.play()
 ).catch((err) -> console.log  err)

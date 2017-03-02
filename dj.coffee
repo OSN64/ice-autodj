@@ -1,5 +1,6 @@
-nodeshout = require 'nodeshout'
+fs = require 'fs'
 nodeID3 = require 'node-id3'
+nodeshout = require 'nodeshout'
 
 class DJ
 
@@ -32,32 +33,31 @@ class DJ
 
     fpath = @playlist[@currentSongIndex]
 
+    return @play() unless fpath.substr(-4) is '.mp3'
+
     @deleteStreams()
 
     @fsStream = new nodeshout.FileReadStream fpath, 65536
-
-    try
-      meta = nodeID3.read fpath # FIX: in some instances returns no music meta data on the same music file ??
-    catch error
-      console.log error
-
-    if meta
-      console.log meta
-      metadata = nodeshout.createMetadata()
-      metadata.add 'song', "#{meta.artist or ''} - #{meta.title or ''} #{@name}"
-      # FIX: all below add calls don't change icecast server metadata
-      metadata.add 'title', meta.title or ''
-      metadata.add 'artist', meta.artist or ''
-      metadata.add 'album', meta.album or ''
-      metadata.add 'genre', meta.genre or ''
+    @fsStream.on 'error', (err) -> console.error '[FS]', err
 
     err = @shout.open()
-    return console.error 'Unable to connect to server error', err unless err is 0 or err is -7 # use nodeshout.ErrorCodes
+    unless err is nodeshout.ErrorTypes.SUCCESS or err is nodeshout.ErrorTypes.CONNECTED
+      return console.error 'Unable to connect to server error', err
+
+    try
+      meta = nodeID3.read fpath
+    catch error
+      return console.error '[META]', err if err
+
+    console.log '[META]', meta
+
+    metadata = nodeshout.createMetadata()
+    metadata.add 'song', "#{@name}#{meta.artist or ''} - #{meta.title or ''}"
+    @shout.setMetadata metadata if metadata
+
+    console.error 'Currently playing file:', fpath
 
     @stream = new nodeshout.ShoutStream @shout
-    metaResult = @shout.setMetadata metadata if metadata
-    console.log 'meta result', metaResult
-    
     @fsStream.pipe(@stream).on 'finish', =>
       metadata.free() if metadata
       @playing = 0

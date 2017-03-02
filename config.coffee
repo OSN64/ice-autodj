@@ -1,4 +1,5 @@
 module.exports =
+  name: ''
   dir: __dirname + '/.tmp/'
   srv:
     host: 'localhost'
